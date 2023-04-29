@@ -20,3 +20,10 @@ ad_list_passengers = assignment_1.add_passenger_flags(ad_list, passengers)
 print(ad_list_passengers)
 
 # passenger flags working
+
+"""
+Test shortest path
+"""
+
+shortest_path = assignment_1.dijkstra_shortest_path(ad_list_passengers, 0, 9)
+print(shortest_path)
