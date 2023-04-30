@@ -15,6 +15,8 @@ def optimalRoute(start, end, passengers, roads):
     in the adjacency list to represent whether or not there is a passenger at that location. The adjacency list is then
     passed to a modified Dijkstra's algorithm that takes into account the passenger flag.
 
+    Unfinished. The implementation is not complete - I thought this assignment was due on Sunday:(
+
     :Input:
         start: integer representing the start location
         end: integer representing the end location
@@ -81,7 +83,7 @@ def add_passenger_flags(adjacency_list: list, passengers) -> list:
         adjacency_list: list of lists of tuples representing the destination that can be reached from a certain 
         location as well as the time taken to reach that destination accompanied/unaccompanied
     :Output: adjecency list of lists with boolean flags appended at each location
-    :Time complexity: O(P) + O(L)
+    :Time complexity: O(P) + O(L) ~ O(L)
         note O(P) < O(L) as P can be at most size |L|
     :Aux space complexity: O(1)
     """
@@ -97,9 +99,9 @@ def add_passenger_flags(adjacency_list: list, passengers) -> list:
 def dijkstra_shortest_path(adjacency_list: list, start: int) -> list:
     """
     Function description:
-    Uses a modified Dijkstra's algorithm to find the shortest path. The modification utilises recursion to redefine
-    start and endpoints once the path encounters a passenger. When a passenger can be added to the car, the function is called 
-    again with the accompanied flag set to true, and finds the shortest path based on there being passengers in the car.
+    Uses a modified Dijkstra's algorithm to find the shortest path. The algorithm is modified to take into account
+    the passenger flag at each location. If the passenger flag is true, the algorithm will consider the time taken
+    to reach that location with a passenger in the car.
 
     :Input:
         adjacency_list: list of lists of tuples representing the destination that can be reached from a certain
@@ -185,6 +187,7 @@ QUESTION 2
 def select_sections(occupancy_probability):
     """
     Function description:
+    Implements full approach, apart from getting miniumum in a row.
 
     Approach description:
     My approach uses dynamic programming to break down the problem. We're essentially finding a path of least resistance
@@ -199,6 +202,12 @@ def select_sections(occupancy_probability):
     This approach solves the problem in small sections, and then uses the solutions to find the larger solution.
     
     An auxillary function get_min(row) is used to convenietly return the index and value of the minimum in a row.
+
+    :Input:
+        occupancy_probability: list of lists of ints representing the probability of a section being occupied
+    :Output: list of integers representing the least occupied path of sections through the occupancy probability matrix
+    :Time complexity: O(mn), where m is # cols and n is # rows in occupancy_probability
+    :Aux space complexity: O(mn)
     """
     running_total = [[0 for col in occupancy_probability[0]] for row in occupancy_probability]
     running_total[0] = occupancy_probability[0]
@@ -251,36 +260,3 @@ def get_min(row, current_index):
         min_value = min(row[current_index-1:current_index+2])
         min_index = row.index(min_value)
     return min_index
-            
-"""
-Helper classes
-"""
-
-class distance_priority_queue():
-    """
-    Priority queue implementation.
-
-    """
-    def __init__(self, list):
-        self.queue = list 
-        self.min = self.__get_min() # O(n)
-    
-    def queue(self, node, distance):
-        self.queue.append((node, distance))
-        if distance < self.min[1]:
-            self.min = (node, distance)
-    
-    def pop(self):
-        if len(self.queue) == 0:
-            return None 
-        self.queue.remove(self.min) # O(n)
-        self.min = min(self.queue) # O(n)
-        return self.min
-    
-    def __get_min(self):
-        current_min = (None, float('inf'))
-        for item in self.queue:
-            if item[1] < self.min[1]:
-                current_min = item
-        return current_min
-    
