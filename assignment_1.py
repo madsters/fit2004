@@ -1,6 +1,7 @@
 """
 QUESTION 1
 """
+import heapq
 
 def optimalRoute(start, end, passengers, roads):
     """
@@ -89,64 +90,89 @@ def add_passenger_flags(adjacency_list: list, passengers) -> list:
             adjacency_list[location][-1] = True
     return adjacency_list
 
-def dijkstra_shortest_path(adjacency_list: list, start: int, end: int, accompanied=False) -> list:
+def dijkstra_shortest_path(adjacency_list: list, start: int) -> list:
     """
     Function description:
     Uses a modified Dijkstra's algorithm to find the shortest path. The modification utilises recursion to redefine
     start and endpoints once the path encounters a passenger. When a passenger can be added to the car, the function is called 
     again with the accompanied flag set to true, and finds the shortest path based on there being passengers in the car.
 
+    :Input:
+        adjacency_list: list of lists of tuples representing the destination that can be reached from a certain
+        location as well as the time taken to reach that destination accompanied/unaccompanied
+        start: integer representing the start location
+        accompanied: boolean representing whether or not there is a passenger in the car
+    :Output: list of integers representing the shortest path between the start and end location
+    :Time complexity: O(R log(L) + L log(L)) ~ O(R log(L)); the R term dominates in the worst case as R can be 
+        at most L^2.
+    :Aux space complexity: O(L)
     """
-    # sets index to look for weight of edge in weighting tuple
-    if accompanied:
-        accompanied = 1
-    else: accompanied = 0
-
-    predecessor = [i for i in range(len(adjacency_list))]
+    # initialise distances, predecessors and queue 
+    predecessors = [None for i in range(len(adjacency_list))]
     distances = []
+
+    # set all distances to infinity and accompanied flag to 0 (False)
+    # distances will keep track of the shortest time to reach a location, as well as if that shortest time
+    # included an accompanying passenger.
+    # it can be assumed that once a passenger is picked up, they will travel with the car until the end of the journey
     for i in range(len(adjacency_list)):
-        distances.append((float('inf'), None))
-    queue = distance_priority_queue(distances)
-
-    unvisited = [i for i in range(len(adjacency_list))]
-    shortest_path = []
+        distances.append((float('inf'), 0))
+    queue = []
     
-    distances[start] = 0
-    # while there are unvisited nodes
-    while unvisited:
-        # find the node with the smallest distance
-        current_node = min(unvisited, key=lambda node: distances[node])
-        # remove the current node from the unvisited list
-        unvisited.remove(current_node)
-        # for each neighbour of the current node
-        for neighbour in adjacency_list[current_node][:-1]: # passenger flag is last element
-            if neighbour[0] not in visited:
-                distance = distances[current_node] + neighbour[1][accompanied]
-                # if the distance is less than the current distance | T: O(1)
-                if distance < distances[neighbour[0]]:
-                    # update the distasnce | T: O(1)
-                    distances[neighbour[0]] = distance
-        # add the current node to the visited list | T: O(1)
-        visited.append(current_node)
+    # set start distance to 0 and check for passengers at start location
+    # push start distance and node to queue
+    if adjacency_list[start][-1]:
+        accompanied = 1
+    else: 
+        accompanied = 0
+    distances[start] = (0, accompanied)
+    heapq.heappush(queue, (0, start))
+    
+    while queue: 
+        # pop node with smallest distance from queue
+        # pops start node initially
+        # will pop node with smallest distance from start node in next iteration
+        # note that smallest distances takes into account whether or not the previous node had
+        # a passenger in the car
+        current_distance, current_node = heapq.heappop(queue)
 
-    pass
+        # check if current node has a passenger
+        if distances[current_node][1] or adjacency_list[current_node][-1]:
+            accompanied = 1
 
-def relax(distances: list, predecessors: list, u: int, v: int, weight: int) -> None:
+        # for each neighbour of current node, relax the distance if shorter than current distance
+        # distance will depend on whether or not the current node has a passenger
+        for neighbour in adjacency_list[current_node]: 
+            # passenger flag, not a nieghbour!
+            if type(neighbour) == bool:
+                continue
+            neighbour_node = neighbour[0]
+            neighbour_distance = neighbour[1][accompanied]
+            relax(distances, queue, predecessors, current_node, neighbour_node, neighbour_distance, accompanied)
+            
+    return distances, predecessors
+
+def relax(distances: list, distances_heap: list, predecessors: list, u: int, v: int, dist_u_to_v: int, accompanied: int) -> None:
     """
     Function description:
-    relaxes the distance of a node v from a node u if the distance from u to v is less than the current distance of v
+    relaxes the distance of a node v from a node u if the distance from u to v is less than the current distance of v,
+    or if the distance from u to v is equal to the current distance of v and u has a passenger in the car.
+    pushes the new distance and node to the queue.
+    if the distance can be relaxed, and u's accompanied flag == 1, then v's flag is set to 1 if not already.
+    if the distance can be relaxed, and u's accompanied flag == 0, then v's flag is set to 0 if not already.
 
     :Input:
         distances: list of distances from a node to the start node
         u: node to relax distance from
         v: node to relax distance to
     :Output: None
-    :Time complexity: O(1)
+    :Time complexity: O(log(L)) worst case
     :Aux space complexity: O(1)
     """
-    if distances[u] + weight < distances[v]:
-        distances[v] = distances[u] + weight
-    predecessors[v] = u
+    if distances[u][0] + dist_u_to_v < distances[v][0] or (distances[u][0] + dist_u_to_v == distances[v][0] and accompanied == 1):
+        distances[v] = (distances[u][0] + dist_u_to_v, accompanied)
+        heapq.heappush(distances_heap, (dist_u_to_v + distances[u][0], v)) # O(log(L))
+        predecessors[v] = u
 
 """
 QUESTION 2
@@ -223,18 +249,6 @@ class distance_priority_queue():
     def __init__(self, list):
         self.queue = list 
         self.min = self.__get_min() # O(n)
-
-    def __setitem__(self, index, node, distance):
-        if len(self.queue) and self.queue[index][1] == self.min[1]:
-            self.queue[index] = (node, distance)
-            self.min = self.__get_min() # O(n)
-        else: 
-            self.queue[index] = (node, distance)
-            if distance < self.min[1]:
-                self.min = (node, distance)
-
-    def __getitem__(self, index):
-        return self.queue[index]
     
     def queue(self, node, distance):
         self.queue.append((node, distance))
