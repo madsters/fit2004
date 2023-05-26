@@ -1,3 +1,9 @@
+class IdiotError(Exception):
+    """
+    For my amusement
+    """
+    pass
+
 """
 CapacityFlowGraph class, has single source and super sink
 """
@@ -9,42 +15,29 @@ class CapacityFlowGraph:
         self.res_graph, self.rev_graph = self.__create_graphs(self.size)
     
     def __create_graphs(self, size):
-        # +2 for super sink, *3 for in, out
-        res_graph = [[0 for i in range(3*(size + 2))] for j in range(3*(size + 2))]
-        rev_graph = [[0 for i in range(3*(size + 2))] for j in range(3*(size + 2))]
+        # +2 for super sink
+        res_graph = [[0 for i in range(size + 2)] for j in range(size + 2)]
+        rev_graph = [[0 for i in range(size + 2)] for j in range(size + 2)]
 
-        # create super sink
+        # !! TODO create super sink for each target
         for target in self.targets:
-            res_graph[-1][target] = float('inf')
-            rev_graph[target][-1] = float('inf') 
-            res_graph[-2][target] = float('inf')
-            rev_graph[target][-2] = float('inf')
-            res_graph[-3][target] = float('inf')
-            rev_graph[target][-3] = float('inf')
+            res_graph[target][size + 1] = float('inf')
+            rev_graph[size + 1][target] = 0
 
         return res_graph, rev_graph
 
-    def add_edge(self, u, v, capacity, uout, vin):
-        u_index = self.vertex_to_index(u)
-        v_index = self.vertex_to_index(v)
+    def get_flow(self):
+        # sum flows from the source
+        flow = 0
+        for i in range(len(self.res_graph[self.source])):
+            flow += self.res_graph[self.source][i]
+        return flow
 
+    def add_edge(self, u, v, capacity):
         # residual edge from u to v, flow = capacity
-        self.res_graph[u_index][v_index] = capacity
+        self.res_graph[u][v] = capacity
         # reverse edge from v to u, flow = 0
-        self.rev_graph[v_index][u_index] = 0
-
-        # residual edge from u to uout, flow = uout, residual edge from vin to v, flow = vin
-        self.res_graph[u_index][u_index + 1] = uout
-        self.res_graph[v_index - 1][v_index] = vin
-        # reverse edge from uout to u, flow = 0, reverse edge from v to vin, flow = 0
-        self.rev_graph[u_index + 1][u_index] = 0
-        self.rev_graph[v_index][v_index - 1] = 0
-
-    def vertex_to_index(vertex):
-        return vertex*3 + 1
-    
-    def index_to_vertex(index):
-        return index//3
+        self.rev_graph[v][u] = 0
     
     def augment_path(self, path, flow):
         # path is list of tuples of (u, v)
@@ -52,30 +45,25 @@ class CapacityFlowGraph:
         for edge in path:
             u = edge[0]
             v = edge[1]
-            flow = edge[2]
+            flow_direction = edge[2]
 
             # forward edge
-            if self.res_graph[u][v] >= flow:
+            if flow_direction == 0 and self.res_graph[u][v]:
                 self.res_graph[u][v] -= flow
                 self.rev_graph[v][u] += flow
             # reverse edge
-            elif self.rev_graph[v][u] >= flow:
+            elif flow_direction == 1 and self.rev_graph[v][u]:
                 self.rev_graph[v][u] -= flow
                 self.res_graph[u][v] += flow
             else:
-                raise ValueError("Invalid path")
+                raise IdiotError("think i have the concept of reverse edges wrong lol")
             
         print('Success augmenting path with flow ', flow)
 
     def find_path_bfs(self):
         visited = []
         parents = [[None] for i in range(len(self.res_graph))]
-        # initialise path list
-        path = []
-        # initialise min capacity
-        min_capacity = float('inf')
-        queue = [self.vertex_to_index(self.source)]
-        parent = None
+        queue = [self.source]
 
         def backtrack(parents):
             # returns path from origin to target and min flow cap
@@ -86,12 +74,20 @@ class CapacityFlowGraph:
 
             min_flow = float('inf')
 
-            while vertex != self.vertex_to_index(self.source):
-                path.append((parents[vertex], vertex))
-                if self.res_graph[parents[vertex]][vertex] < min_flow:
-                vertex = parents[vertex]
+            while vertex != self.source:
+                path.append((parents[vertex][0], vertex, parents[vertex][1]))
+                if parents[vertex][1] == 0:
+                    if self.res_graph[parents[vertex][0]][vertex] < min_flow:
+                        min_flow = self.res_graph[parents[vertex][0]][vertex]
+                elif parents[vertex][0][1] == 1:
+                    if self.rev_graph[parents[vertex][0]][vertex] < min_flow:
+                        min_flow = self.rev_graph[parents[vertex][0]][vertex]
+                else:
+                    raise IdiotError("hmmmmmmmmmmmm what is going on lmao")
+                vertex = parents[vertex][0]
 
-            return path.reverse()
+            path.reverse()
+            return path, min_flow
 
         found_path = False
 
@@ -101,7 +97,6 @@ class CapacityFlowGraph:
 
             if vertex not in visited:
                 visited.append(vertex)
-                parents[vertex] = parent
 
                 # end of path!
                 if vertex == len(self.res_graph) - 1:
@@ -116,13 +111,13 @@ class CapacityFlowGraph:
                             # queue i
                             queue.append(i)
                             # set parent for i
-                            parents[i] = vertex
+                            parents[i] = (vertex, 0)
                         # valid path option! "reverse edge"
                         elif self.rev_graph[vertex][i] > 0:
                             # queue i
                             queue.append(i)
                             # set parent for i
-                            parents[i] = vertex
+                            parents[i] = (vertex, 1)
                         # edge full/no edge!
                         else:
                             continue
@@ -150,5 +145,20 @@ def maxThroughput(connections, maxIn, maxOut, origin, targets):
 
     # create adjacency matrix O(C)
     for connection in connections:
-        graph.add_edge(connection[0], connection[1], connection[2], maxIn[connection[0]], maxOut[connection[1]])
+        graph.add_edge(connection[0], connection[1], connection[2])
 
+    # find path O(D)
+    path, min_flow = graph.find_path_bfs()
+    while path:
+        graph.augment_path(path, min_flow)
+        path, min_flow = graph.find_path_bfs()
+    return graph.get_flow()
+
+# main
+if __name__ == "__main__":
+    connections = [(0, 1, 3000), (1, 2, 2000), (1, 3, 1000), (0, 3, 2000), (3, 4, 2000), (3, 2, 1000)]
+    maxIn = [5000, 3000, 3000, 3000, 2000]
+    maxOut = [5000, 3000, 3000, 2500, 1500]
+    origin = 0
+    targets = [4, 2]
+    print(maxThroughput(connections, maxIn, maxOut, origin, targets))
