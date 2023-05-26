@@ -19,18 +19,20 @@ class CapacityFlowGraph:
         res_graph = [[0 for i in range(size + 2)] for j in range(size + 2)]
         rev_graph = [[0 for i in range(size + 2)] for j in range(size + 2)]
 
-        # !! TODO create super sink for each target
+        # create super sink connected to each target
         for target in self.targets:
             res_graph[target][size + 1] = float('inf')
-            rev_graph[size + 1][target] = 0
+            rev_graph[size + 1][target] = float('inf')
+            self.super_sink = size + 1
 
         return res_graph, rev_graph
 
     def get_flow(self):
-        # sum flows from the source
+        # sum flows into the self.targets from the reversible flow graph
         flow = 0
-        for i in range(len(self.res_graph[self.source])):
-            flow += self.res_graph[self.source][i]
+        for target in self.targets:
+            for i in range(len(self.rev_graph[target])):
+                flow += self.rev_graph[target][i]
         return flow
 
     def add_edge(self, u, v, capacity):
@@ -46,6 +48,10 @@ class CapacityFlowGraph:
             u = edge[0]
             v = edge[1]
             flow_direction = edge[2]
+
+            # no need to augment if super sink
+            if v == self.super_sink or u == self.super_sink:
+                continue
 
             # forward edge
             if flow_direction == 0 and self.res_graph[u][v]:
@@ -80,8 +86,8 @@ class CapacityFlowGraph:
                     if self.res_graph[parents[vertex][0]][vertex] < min_flow:
                         min_flow = self.res_graph[parents[vertex][0]][vertex]
                 elif parents[vertex][0][1] == 1:
-                    if self.rev_graph[parents[vertex][0]][vertex] < min_flow:
-                        min_flow = self.rev_graph[parents[vertex][0]][vertex]
+                    if self.rev_graph[vertex][parents[vertex][0]] < min_flow:
+                        min_flow = self.rev_graph[vertex][parents[vertex][0]]
                 else:
                     raise IdiotError("hmmmmmmmmmmmm what is going on lmao")
                 vertex = parents[vertex][0]
